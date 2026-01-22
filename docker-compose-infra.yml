@@ -1,0 +1,37 @@
+version: '3.8'
+networks:
+  bigdata_network:
+    external: true
+
+services:
+  zookeeper:
+    image: zookeeper:3.8
+    networks: [ bigdata_network ]
+    # L'environnement change légèrement pour l'image officielle
+    environment:
+      - ZOO_MY_ID=1
+
+  kafka:
+    image: wurstmeister/kafka:latest # Image très stable pour les projets d'études
+    container_name: kafka
+    networks: [ bigdata_network ]
+    ports: [ "9092:9092" ]
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
+    depends_on: [ zookeeper ]
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    networks: [ bigdata_network ]
+    ports: [ "9870:9870" ]
+    environment: [ CLUSTER_NAME=test ]
+    env_file: [ ./hadoop.env ]
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    networks: [ bigdata_network ]
+    depends_on: [ namenode ]
+    env_file: [ ./hadoop.env ]

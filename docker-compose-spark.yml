@@ -1,0 +1,27 @@
+services:
+  spark-master:
+    image: apache/spark:3.5.0
+    container_name: spark-master
+    networks:
+      - bigdata_network
+    ports:
+      - "8181:8080"
+      - "7077:7077"
+    # On utilise le chemin absolu correct de l'image Apache
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+
+  spark-worker:
+    image: apache/spark:3.5.0
+    container_name: spark-worker
+    networks:
+      - bigdata_network
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+    depends_on:
+      - spark-master
+    # On utilise le chemin absolu correct ici aussi
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+
+networks:
+  bigdata_network:
+    external: true
