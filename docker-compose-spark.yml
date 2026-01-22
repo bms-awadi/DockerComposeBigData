@@ -7,7 +7,7 @@ services:
     ports:
       - "8181:8080"
       - "7077:7077"
-    # On utilise le chemin absolu correct de l'image Apache
+    # chemin absolu correct de l'image Apache
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
 
   spark-worker:
@@ -19,7 +19,6 @@ services:
       - SPARK_MASTER=spark://spark-master:7077
     depends_on:
       - spark-master
-    # On utilise le chemin absolu correct ici aussi
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
 
 networks:
