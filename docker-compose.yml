@@ -1,8 +1,9 @@
-version: '3.8'
+﻿version: '3.8'
 
 networks:
   bigdata_network:
-    external: true
+    name: ${NETWORK_NAME}
+    driver: bridge
 
 services:
   jupyter:
