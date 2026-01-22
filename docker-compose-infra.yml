@@ -7,12 +7,11 @@ services:
   zookeeper:
     image: zookeeper:3.8
     networks: [ bigdata_network ]
-    # L'environnement change légèrement pour l'image officielle
     environment:
       - ZOO_MY_ID=1
 
   kafka:
-    image: wurstmeister/kafka:latest # Image très stable pour les projets d'études
+    image: wurstmeister/kafka:latest
     container_name: kafka
     networks: [ bigdata_network ]
     ports: [ "9092:9092" ]
@@ -26,12 +25,23 @@ services:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
     networks: [ bigdata_network ]
-    ports: [ "9870:9870" ]
-    environment: [ CLUSTER_NAME=test ]
+    ports: [ "9870:9870", "9000:9000" ]
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
     env_file: [ ./hadoop.env ]
+    command: >
+      bash -c " /run.sh & sleep 20 && hdfs dfs -mkdir -p /weather && hdfs dfs -chown jovyan:supergroup /weather && hdfs dfs -chmod 755 /weather && echo 'HDFS directory /weather created with permissions for jovyan' && tail -f /dev/null "
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     networks: [ bigdata_network ]
     depends_on: [ namenode ]
+    volumes:
+      - datanode_data:/hadoop/dfs/data
     env_file: [ ./hadoop.env ]
+
+volumes:
+  namenode_data:
+  datanode_data:
