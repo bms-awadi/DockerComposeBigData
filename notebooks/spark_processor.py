@@ -2,10 +2,15 @@ import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, window, avg, count
 from pyspark.sql.types import *
+from hdfs import InsecureClient
+from io import StringIO
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "weather_transformed")
 SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark-master:7077")
+HDFS_URL = os.getenv("HDFS_URL", "http://namenode:9870")
+HDFS_USER = os.getenv("HDFS_USER", "jovyan")
+HDFS_DIR = os.getenv("HDFS_DIR", "/user/jovyan/weather")
 
 def main():
     spark = SparkSession.builder \
@@ -35,16 +40,57 @@ def main():
         .select("data.*") \
         .withColumn("event_time", col("time").cast(TimestampType()))
     
-    # Agrégation sur fenêtre temporelle de 1 minute
+    # Agregation sur fenetre temporelle de 1 minute
     agg = parsed.groupBy(window(col("event_time"), "1 minute")) \
         .agg(
             avg("temperature").alias("avg_temp_c"),
             count(col("high_wind_alert")).alias("alert_count")
         )
     
-    print("Agrégation météo sur fenêtre de 1 minute")
+    print("Agregation meteo sur fenetre de 1 minute")
     agg.show(truncate=False)
-    print(f"Nombre de fenêtres temporelles: {agg.count()}")
+    print(f"Nombre de fenetres temporelles: {agg.count()}")
+    
+    # === SAUVEGARDE DANS HDFS ===
+    print("Sauvegarde dans HDFS...")
+    
+    try:
+        # Creer le client HDFS
+        client = InsecureClient(HDFS_URL, user=HDFS_USER)
+        
+        # Verifier que le dossier existe
+        try:
+            client.status(HDFS_DIR)
+            print(f"Dossier HDFS existe: {HDFS_DIR}")
+        except:
+            print(f"Creation du dossier: {HDFS_DIR}")
+            client.makedirs(HDFS_DIR)
+        
+        # Convertir en Pandas et CSV
+        pandas_df = agg.toPandas()
+        csv_buffer = StringIO()
+        pandas_df.to_csv(csv_buffer, index=False)
+        csv_data = csv_buffer.getvalue()
+        
+        # Chemin du fichier dans HDFS
+        hdfs_path = f"{HDFS_DIR}/aggregated_data.csv"
+        
+        # Ecrire dans HDFS
+        with client.write(hdfs_path, overwrite=True, encoding='utf-8') as writer:
+            writer.write(csv_data)
+        
+        print(f"Fichier sauvegarde: {hdfs_path}")
+        print(f"Nombre de lignes: {len(pandas_df)}")
+        print(f"Taille: {len(csv_data)} bytes")
+        
+        # Verifier le fichier
+        file_status = client.status(hdfs_path)
+        print(f"Verification HDFS: {file_status}")
+        
+    except Exception as e:
+        print(f"Erreur lors de la sauvegarde HDFS: {e}")
+        import traceback
+        traceback.print_exc()
     
     spark.stop()
 
